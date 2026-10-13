@@ -35,10 +35,44 @@ public class Order {
         this.deliveryAddress = deliveryAddress.trim();
     }
 
-    public void addItem(OrderItem item) {
+    public void checkCanAddItems() {
         if (status != OrderStatus.NEW && status != OrderStatus.CONFIRMED) {
-            throw new DeliveryException("Позиции можно добавлять только до назначения курьера или завершения заказа.");
+            throw new DeliveryException(
+                    "Позиции можно добавлять только в заказ в статусе \"Новый\" или \"Подтверждён\". "
+                            + "Текущий статус: \"" + status.getTitle() + "\"."
+            );
         }
+    }
+
+    public void checkCanSelectDeliveryMethod() {
+        if (status != OrderStatus.NEW && status != OrderStatus.CONFIRMED) {
+            throw new DeliveryException(
+                    "Способ доставки можно выбрать только для заказа в статусе \"Новый\" или \"Подтверждён\". "
+                            + "Текущий статус: \"" + status.getTitle() + "\"."
+            );
+        }
+    }
+
+    public void checkCanAssignCourier() {
+        if (deliveryMethod == null) {
+            throw new DeliveryException("Сначала выберите способ доставки.");
+        }
+        if (!deliveryMethod.requiresCourier()) {
+            throw new DeliveryException("Для выбранного способа доставки курьер не требуется.");
+        }
+        if (status != OrderStatus.CONFIRMED) {
+            throw new DeliveryException(
+                    "Курьера можно назначить только для заказа в статусе \"Подтверждён\". "
+                            + "Текущий статус: \"" + status.getTitle() + "\"."
+            );
+        }
+        if (courier != null) {
+            throw new DeliveryException("Курьер уже назначен на этот заказ.");
+        }
+    }
+
+    public void addItem(OrderItem item) {
+        checkCanAddItems();
 
         items.add(Objects.requireNonNull(item, "Позиция не может быть null."));
         recalculateItemsTotal();
@@ -55,9 +89,7 @@ public class Order {
     }
 
     public void selectDeliveryMethod(DeliveryMethod method) {
-        if (status != OrderStatus.NEW && status != OrderStatus.CONFIRMED) {
-            throw new DeliveryException("Способ доставки можно выбрать только до назначения курьера или завершения заказа.");
-        }
+        checkCanSelectDeliveryMethod();
 
         this.deliveryMethod = Objects.requireNonNull(method, "Способ доставки не может быть null.");
         this.deliveryCost = method.calculateCost(itemsTotal);
@@ -68,18 +100,8 @@ public class Order {
     }
 
     public void assignCourier(Courier courier) {
-        if (deliveryMethod == null) {
-            throw new DeliveryException("Сначала выберите способ доставки.");
-        }
-        if (!deliveryMethod.requiresCourier()) {
-            throw new DeliveryException("Для выбранного способа доставки курьер не требуется.");
-        }
-        if (status != OrderStatus.CONFIRMED) {
-            throw new DeliveryException("Курьера можно назначить только для подтверждённого заказа.");
-        }
-        if (this.courier != null) {
-            throw new DeliveryException("Курьер уже назначен.");
-        }
+        checkCanAssignCourier();
+
         if (courier == null) {
             throw new DeliveryException("Курьер не может быть null.");
         }
