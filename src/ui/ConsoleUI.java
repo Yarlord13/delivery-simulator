@@ -156,15 +156,6 @@ public class ConsoleUI {
         }
 
         int orderNumber = readInt("Номер заказа: ");
-        Order order = orderService.getOrder(orderNumber);
-
-        if (order.getDeliveryMethod().isEmpty()) {
-            throw new DeliveryException("Сначала выберите способ доставки.");
-        }
-
-        if (!order.getDeliveryMethod().get().requiresCourier()) {
-            throw new DeliveryException("Для самовывоза курьер не требуется.");
-        }
 
         List<Courier> available = orderService.getAvailableCouriers();
 
