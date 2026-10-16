@@ -1,12 +1,14 @@
 package domain;
 
+import util.InputValidator;
+
 public final class Customer {
     private final String name;
     private final String phone;
 
     public Customer(String name, String phone) {
-        this.name = requireNonBlank(name, "Имя клиента");
-        this.phone = requireNonBlank(phone, "Телефон клиента");
+        this.name = InputValidator.requireNonBlank(name, "Имя клиента");
+        this.phone = InputValidator.requirePhone(phone, "Телефон клиента");
     }
 
     private static String requireNonBlank(String value, String fieldName) {

@@ -1,5 +1,7 @@
 package domain;
 
+import util.InputValidator;
+
 public class Courier {
     private final int id;
     private final String name;
@@ -11,8 +13,8 @@ public class Courier {
             throw new DeliveryException("ID курьера должен быть положительным.");
         }
         this.id = id;
-        this.name = requireNonBlank(name, "Имя курьера");
-        this.phone = requireNonBlank(phone, "Телефон курьера");
+        this.name = InputValidator.requireNonBlank(name, "Имя курьера");
+        this.phone = InputValidator.requirePhone(phone, "Телефон курьера");
         this.available = true;
     }
 

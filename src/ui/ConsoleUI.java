@@ -1,16 +1,8 @@
 package ui;
 
-import domain.Courier;
-import domain.Customer;
-import domain.DeliveryException;
-import domain.DeliveryMethod;
-import domain.ExpressDelivery;
-import domain.Order;
-import domain.OrderItem;
-import domain.OrderStatus;
-import domain.PickupDelivery;
-import domain.StandardDelivery;
+import domain.*;
 import service.OrderService;
+import util.InputValidator;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -67,9 +59,9 @@ public class ConsoleUI {
     private void createOrder() {
         System.out.println("Создание заказа");
 
-        String name = readNonEmpty("Имя клиента: ");
-        String phone = readNonEmpty("Телефон клиента: ");
-        String address = readNonEmpty("Адрес доставки: ");
+        String name = readNonEmpty("Имя клиента: ", "Имя клиента");
+        String phone = readPhone("Телефон клиента: ");
+        String address = readNonEmpty("Адрес доставки: ", "Адрес доставки");
 
         Customer customer = new Customer(name, phone);
         Order order = orderService.createOrder(customer, address);
@@ -107,12 +99,49 @@ public class ConsoleUI {
     }
 
     private void addItemToOrder(int orderNumber) {
-        String itemName = readNonEmpty("Название товара: ");
-        int quantity = readPositiveInt("Количество: ");
-        BigDecimal price = readPositiveBigDecimal("Цена за единицу: ");
+        Order order = orderService.getOrder(orderNumber);
+        order.checkCanAddItems();              // бизнес-проверка до диалога
 
-        orderService.addItem(orderNumber, new OrderItem(itemName, quantity, price));
+        List<Product> available = orderService.getCatalog().getAvailable();
+        if (available.isEmpty()) {
+            System.out.println("Нет доступных товаров.");
+            return;
+        }
+
+        System.out.println("Доступные товары:");
+        for (Product p : available) {
+            System.out.println(p);
+        }
+
+        Product product = readAvailableProduct(available);
+        int quantity = readQuantityWithinStock(product);
+
+        orderService.addItem(orderNumber, product.getId(), quantity);
         System.out.println("Позиция добавлена.");
+    }
+
+    private Product readAvailableProduct(List<Product> available) {
+        while (true) {
+            int id = readPositiveInt("ID товара: ");
+            Product product = available.stream()
+                    .filter(p -> p.getId() == id)
+                    .findFirst()
+                    .orElse(null);
+            if (product != null) {
+                return product;
+            }
+            System.out.println("Товар с ID " + id + " отсутствует в списке доступных.");
+        }
+    }
+
+    private int readQuantityWithinStock(Product product) {
+        while (true) {
+            int q = readPositiveInt("Количество: ");
+            if (q <= product.getAvailableQuantity()) {
+                return q;
+            }
+            System.out.println("Недостаточно товара. Доступно: " + product.getAvailableQuantity());
+        }
     }
 
     private void selectDeliveryMethod() {
@@ -156,24 +185,38 @@ public class ConsoleUI {
         }
 
         int orderNumber = readInt("Номер заказа: ");
+        Order order = orderService.getOrder(orderNumber);
+        order.checkCanAssignCourier();         // до запроса данных
 
         List<Courier> available = orderService.getAvailableCouriers();
-
         if (available.isEmpty()) {
             System.out.println("Нет доступных курьеров.");
             return;
         }
 
         System.out.println("Доступные курьеры:");
-        for (Courier courier : available) {
-            System.out.println(courier);
+        for (Courier c : available) {
+            System.out.println(c);
         }
 
-        int courierId = readInt("ID курьера: ");
-        Courier courier = orderService.getCourier(courierId);
+        Courier courier = readAvailableCourier(available);
 
         orderService.assignCourier(orderNumber, courier);
         System.out.println("Курьер " + courier.getName() + " назначен на заказ №" + orderNumber + ".");
+    }
+
+    private Courier readAvailableCourier(List<Courier> available) {
+        while (true) {
+            int id = readPositiveInt("ID курьера: ");
+            Courier courier = available.stream()
+                    .filter(c -> c.getId() == id)
+                    .findFirst()
+                    .orElse(null);
+            if (courier != null) {
+                return courier;
+            }
+            System.out.println("Курьер с ID " + id + " отсутствует в списке доступных.");
+        }
     }
 
     private void changeStatus() {
@@ -219,7 +262,6 @@ public class ConsoleUI {
         while (true) {
             System.out.print(prompt);
             String line = scanner.nextLine().trim();
-
             try {
                 return Integer.parseInt(line);
             } catch (NumberFormatException e) {
@@ -231,54 +273,47 @@ public class ConsoleUI {
     private int readPositiveInt(String prompt) {
         while (true) {
             int value = readInt(prompt);
-            if (value > 0) {
-                return value;
-            }
-            System.out.println("Число должно быть положительным.");
-        }
-    }
-
-    private BigDecimal readPositiveBigDecimal(String prompt) {
-        while (true) {
-            System.out.print(prompt);
-            String line = scanner.nextLine().trim().replace(',', '.');
-
             try {
-                BigDecimal value = new BigDecimal(line);
-                if (value.compareTo(BigDecimal.ZERO) > 0) {
-                    return value;
-                }
-                System.out.println("Число должно быть положительным.");
-            } catch (NumberFormatException e) {
-                System.out.println("Введите число, например 199.99.");
+                return InputValidator.requirePositive(value, "Число");
+            } catch (DeliveryException e) {
+                System.out.println(e.getMessage());
             }
         }
     }
 
-    private String readNonEmpty(String prompt) {
+    private String readNonEmpty(String prompt, String fieldName) {
         while (true) {
             System.out.print(prompt);
-            String line = scanner.nextLine().trim();
-
-            if (!line.isEmpty()) {
-                return line;
+            String line = scanner.nextLine();
+            try {
+                return InputValidator.requireNonBlank(line, fieldName);
+            } catch (DeliveryException e) {
+                System.out.println(e.getMessage());
             }
+        }
+    }
 
-            System.out.println("Поле не может быть пустым.");
+    private String readPhone(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String line = scanner.nextLine();
+            try {
+                return InputValidator.requirePhone(line, "Телефон");
+            } catch (DeliveryException e) {
+                System.out.println(e.getMessage());
+            }
         }
     }
 
     private boolean readYesNo(String prompt) {
         while (true) {
-            String answer = readNonEmpty(prompt).toLowerCase();
-
+            String answer = readNonEmpty(prompt, "Ответ").toLowerCase();
             if (answer.equals("да") || answer.equals("д") || answer.equals("yes") || answer.equals("y")) {
                 return true;
             }
             if (answer.equals("нет") || answer.equals("н") || answer.equals("no") || answer.equals("n")) {
                 return false;
             }
-
             System.out.println("Ответьте \"да\" или \"нет\".");
         }
     }
