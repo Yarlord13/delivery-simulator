@@ -1,46 +1,32 @@
 package domain;
 
+import domain.DeliveryException;
+import domain.Product;
+import util.InputValidator;
+
 import java.math.BigDecimal;
 
 public final class OrderItem {
-    private final String name;
+    private final Product product;
     private final int quantity;
-    private final BigDecimal price;
 
-    public OrderItem(String name, int quantity, BigDecimal price) {
-        if (name == null || name.isBlank()) {
-            throw new DeliveryException("Название товара не может быть пустым.");
+    public OrderItem(Product product, int quantity) {
+        if (product == null) {
+            throw new DeliveryException("Товар не может быть null.");
         }
-        if (quantity <= 0) {
-            throw new DeliveryException("Количество должно быть положительным.");
-        }
-        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new DeliveryException("Цена должна быть положительной.");
-        }
-
-        this.name = name.trim();
-        this.quantity = quantity;
-        this.price = price;
+        this.product = product;
+        this.quantity = InputValidator.requirePositive(quantity, "Количество");
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public int getQuantity() {
-        return quantity;
-    }
-
-    public BigDecimal getPrice() {
-        return price;
-    }
+    public Product getProduct() { return product; }
+    public int getQuantity()    { return quantity; }
 
     public BigDecimal getTotal() {
-        return price.multiply(BigDecimal.valueOf(quantity));
+        return product.getPrice().multiply(BigDecimal.valueOf(quantity));
     }
 
     @Override
     public String toString() {
-        return name + " x" + quantity + " = " + getTotal();
+        return product.getName() + " x" + quantity + " = " + getTotal();
     }
 }

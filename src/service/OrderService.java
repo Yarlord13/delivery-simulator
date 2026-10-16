@@ -1,12 +1,6 @@
 package service;
 
-import domain.Courier;
-import domain.Customer;
-import domain.DeliveryException;
-import domain.DeliveryMethod;
-import domain.Order;
-import domain.OrderItem;
-import domain.OrderStatus;
+import domain.*;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -16,6 +10,7 @@ import java.util.Map;
 public class OrderService {
     private final Map<Integer, Order> orders = new LinkedHashMap<>();
     private final List<Courier> couriers = new ArrayList<>();
+    private final ProductCatalog catalog = new ProductCatalog();
     private int nextOrderNumber = 1;
 
     public OrderService() {
@@ -24,14 +19,20 @@ public class OrderService {
         couriers.add(new Courier(3, "Павел Орлов", "+7-900-333-44-55"));
     }
 
+    public ProductCatalog getCatalog() {
+        return catalog;
+    }
+
     public Order createOrder(Customer customer, String deliveryAddress) {
         Order order = new Order(nextOrderNumber++, customer, deliveryAddress);
         orders.put(order.getNumber(), order);
         return order;
     }
 
-    public void addItem(int orderNumber, OrderItem item) {
-        getOrder(orderNumber).addItem(item);
+    public void addItem(int orderNumber, int productId, int quantity) {
+        Order order = getOrder(orderNumber);
+        Product product = catalog.getById(productId);
+        order.addItem(product, quantity);
     }
 
     public List<Order> getOrders() {
@@ -58,6 +59,9 @@ public class OrderService {
         Order order = getOrder(orderNumber);
         order.changeStatus(newStatus);
 
+        if (newStatus == OrderStatus.CANCELLED) {
+            order.releaseItems();
+        }
         if (newStatus == OrderStatus.COMPLETED || newStatus == OrderStatus.CANCELLED) {
             order.getCourier().ifPresent(Courier::markAvailable);
         }
@@ -67,16 +71,5 @@ public class OrderService {
         return couriers.stream()
                 .filter(Courier::isAvailable)
                 .toList();
-    }
-
-    public List<Courier> getAllCouriers() {
-        return List.copyOf(couriers);
-    }
-
-    public Courier getCourier(int id) {
-        return couriers.stream()
-                .filter(c -> c.getId() == id)
-                .findFirst()
-                .orElseThrow(() -> new DeliveryException("Курьер с ID " + id + " не найден."));
     }
 }

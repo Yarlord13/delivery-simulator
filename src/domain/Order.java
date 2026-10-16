@@ -71,14 +71,25 @@ public class Order {
         }
     }
 
-    public void addItem(OrderItem item) {
+    public void addItem(Product product, int quantity) {
         checkCanAddItems();
+        if (product == null) {
+            throw new DeliveryException("Товар не может быть null.");
+        }
 
-        items.add(Objects.requireNonNull(item, "Позиция не может быть null."));
+        product.reserve(quantity);
+
+        items.add(new OrderItem(product, quantity));
         recalculateItemsTotal();
 
         if (deliveryMethod != null) {
             deliveryCost = deliveryMethod.calculateCost(itemsTotal);
+        }
+    }
+
+    public void releaseItems() {
+        for (OrderItem item : items) {
+            item.getProduct().release(item.getQuantity());
         }
     }
 
